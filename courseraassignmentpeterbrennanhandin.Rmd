@@ -1,0 +1,333 @@
+---
+title: "Coursera-mcmc-statistics-peer-review-article"
+author: "Peter Brennan"
+date: "3/29/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## load libraries
+
+```{r, echo=FALSE, warning=FALSE}
+##install.packages("tidyverse")
+library(magrittr)
+require(FactoMineR)
+library(ggplot2)
+library(caret)
+library(dplyr)
+library(R2jags)
+library(plotly)
+```
+
+
+## Research Question, Does irradiation (radiation treatment) effect recurrence of or non recurrence of breast cancer
+
+We will use Breast cancer data set (a dataset containing categorical data attributes) to try to ascertain the effect of irradiation (radiation treatment) on the recurrence or non-recurrence of breast cancer in the observed data.
+
+## Plan and collect data from a relevant source
+
+The data was chosen from, https://archive.ics.uci.edu/ml/datasets/breast+cancer.
+The data contains a data file containing the data and a names file containing some meta data about the data. The names of the data attributes are given: 
+ 1. Class: no-recurrence-events, recurrence-events
+ 2. age: 10-19, 20-29, 30-39, 40-49, 50-59, 60-69, 70-79, 80-89, 90-99.
+ 3. menopause: lt40, ge40, premeno.
+ 4. tumor-size: 0-4, 5-9, 10-14, 15-19, 20-24, 25-29, 30-34, 35-39, 40-44,
+ 45-49, 50-54, 55-59.
+ 5. inv-nodes: 0-2, 3-5, 6-8, 9-11, 12-14, 15-17, 18-20, 21-23, 24-26,
+ 27-29, 30-32, 33-35, 36-39.
+ 6. node-caps: yes, no.
+ 7. degree.malignant: 1, 2, 3.
+ 8. breast: left, right.
+ 9. breast-quad: left-up, left-low, right-up,	right-low, central.
+ 10. irradiation:	yes, no.
+
+It should be noted that all data are categorical in nature. We will read in the data, set the column names and output the first 5 rows to see the form of the data, we will also the degree.malgnant data attribute to a factor as this is ordinal data not numeric. 
+
+```{r , echo=TRUE}
+breast.cancer<-read.csv("breast-cancer.data",header=FALSE,sep=",")
+colnames(breast.cancer)<-c("Class","age","menopause","tumor.size","inv.nodes","node.caps",
+                           "degree.malignant","breast","breast.quadrant","irradiation")
+
+
+breast.cancer$degree.malignant<- breast.cancer$degree.malignant %>% as.character() %>% as.factor()
+
+cols<-c("Class","age","menopause","tumor.size","inv.nodes","node.caps","breast","breast.quadrant","irradiation")
+
+breast.cancer[,cols] <- lapply(breast.cancer[,cols],as.factor)
+
+
+head(breast.cancer)
+
+```
+
+Next it is important to perform a summary of the data, to check for missing data and to look at the modal classes for each attribute type
+
+```{r, echo=TRUE}
+summary(breast.cancer)
+```
+From the summary it can be seen that there is some missing data from node.caps and breast quadrant data attributes, but apart from that the dataset looks to be of good quality, at least for the purpose of this exercise.
+
+## Explore data
+
+To try to ascertain if any interesting  relationships exist in the data a number of data visualization techniques were used, these included:
+1. Multiple Correspondence Analysis plot. Here we run multiple correspondence on the data and visualize the results in the hope of identifying strong associations between different attributes.
+2. Visualizing the data in the form of stacked bar charts (and stacked bar percent) to look at the relationships/associations between variables.
+3. Using contingency tables to look at the proportions between  different attributes usign dplyr and table.
+
+# Multiple Correspondence Analysis plot
+
+```{r, echo=TRUE}
+
+cats = apply(breast.cancer, 2, function(x) nlevels(as.factor(x)))
+cats
+mca1 = MCA(breast.cancer, graph = FALSE)
+mca1_vars_df = data.frame(mca1$var$coord, Variable = rep(names(cats),
+                                                         cats))
+mca1_obs_df = data.frame(mca1$ind$coord)
+# plot of variable categories
+ggplot(data = mca1_vars_df, aes(x = Dim.1, y = Dim.2, label = rownames(mca1_vars_df))) +
+  geom_hline(yintercept = 0, colour = "gray70") + geom_vline(xintercept = 0,
+                                                             colour = "gray70") + geom_text(aes(colour = Variable)) + ggtitle("MCA plot of breast cancer variables")
+ 
+
+```
+From the plot we can see some potentially interesting associations:
+ 1. There appears to be a strong association between irradiation and recurrence events as opposed
+to a strong association with  no irradiation and no-recurrence events
+ 2. There also appears to be a strong relationship between node-cap-no and Class.
+ 
+This is a little clearer if we create an interactive plot, which allows us to interactively explore the data:
+ 
+```{r, echo=FALSE}
+
+cats = apply(breast.cancer, 2, function(x) nlevels(as.factor(x)))
+cats
+mca1 = MCA(breast.cancer, graph = FALSE)
+mca1_vars_df = data.frame(mca1$var$coord, Variable = rep(names(cats),
+                                                         cats))
+mca1_obs_df = data.frame(mca1$ind$coord)
+# plot of variable categories
+gp<-ggplot(data = mca1_vars_df, aes(x = Dim.1, y = Dim.2, label = rownames(mca1_vars_df))) +
+  geom_hline(yintercept = 0, colour = "gray70") + geom_vline(xintercept = 0,
+                                                             colour = "gray70") + geom_text(aes(colour = Variable)) + ggtitle("MCA plot of breast cancer variables (interactive plotly plot)")
+
+ggplotly(gp)
+
+```
+# Visualizing the data in the form of stacked bar charts (and stacked bar percent) to look at the relationships/associations between variables.
+
+```{r, echo=FALSE}
+
+ggplot(breast.cancer %>% group_by(irradiation,Class) %>% tally(), aes(fill=irradiation, y=n, x=Class)) +
+  geom_bar(position="fill", stat="identity") +ggtitle("Stacked percent bar chart, of recurrence and irradiation ") +xlab("Recurrence event")+ylab("Count of cases")
+
+
+```
+
+It iss clear from the bar chart there is a stronger association between irradiation and recurrence events as opposed to no irradiation and no recurrence events. The same data is shown below in a standard stacked bar chart form.
+
+```{r, echo=FALSE}
+ggplot(breast.cancer %>% group_by(irradiation,Class) %>% tally(), aes(fill=irradiation, y=n, x=Class)) +geom_bar(position="stack", stat="identity")+ggtitle("Stacked bar chart, of recurrence and irradiation ") +xlab("Recurrence event")+ylab("Count of cases")
+
+```
+
+# Contingency tables to look at the proportions between  different attributes usign dplyr and table.
+
+The above relationships can also be viewed as contingency tables using either (a) dplyr or the (b) table function. In both cases a strong association is seen between irradiation and recurrence-events
+
+```{r}
+breast.cancer %>% group_by(irradiation,Class) %>% tally()
+```
+or as a contingency table
+
+```{r}
+table(breast.cancer$irradiation,breast.cancer$Class)
+```
+## Postulating a model
+
+We will build a model which aims to show the proportions could not have come equal proportions (i.e there is no association between them) as opposed to the proportions being unequal and a strong association exists between the groups (irradiation and recurrence events). This is equivalent to a bayesian re-interpretation of the proportions test.
+
+# Describe how the model is well suited to answer your question.
+
+The likelihood model indicates that the observed counts are modeled by a
+binomial distribution with a probability of p (fraction for each group/total samples) from n trials (items= tot_samples).
+
+# Identify how inference for parameters in the model will provide evidence relating to your question.
+
+The prior on each p is defined as a beta distribution with shape parameters a and b
+The hyperpriors for each a and b are drawn from imprecise (non informative) gamma distributions.
+As input, JAGS is supplied with:
+1. The observed data (obs)
+2. The total number of observed items (n), total samples=164+54+37+31 (see contingency table above)
+3. The number of classification groups (nGroups)
+
+# Write the full hierarchical specification of the model.
+
+The model specification is shown below:
+
+```{r}
+modelString1="
+model {
+   #Likelihood
+  for (i in 1:nGroups) {
+    obs[i] ~ dbin(p[i],n[i])
+    p[i] ~ dbeta(a[i],b[i])
+    a[i] ~ dgamma(1,0.01)
+    b[i] ~ dgamma(1,0.01)
+  }
+}
+"
+
+```
+
+
+# Justify your choice of prior distributions.
+
+The beta distribution is used as this is the conjugate prior to the beta distribution, what this means is that if the likelihood function is binomial and the prior distribution, then the posterior distribution is also a beta distribution.
+
+## Fit the model
+
+The model is fit below, as stated in our model specification:
+1. The observed data (obs), the observed frequencies of the different groups supplied from the contingency table, (see above).
+2. The total number of observed items (n), total samples=164+54+37+31 (see contingency table above)
+3. The number of classification groups (nGroups)
+
+
+```{r}
+tot_samples=164+54+37+31
+params<-c("p")
+
+obs <- c(54, 164,37,31)
+data.list <- list(obs = obs, n = c(tot_samples, tot_samples,tot_samples,tot_samples), nGroups = 4)
+mod1 = jags.model(textConnection(modelString1), data=data.list, inits=NULL, n.chains=3)
+update(mod1, 5e3) ## burn in 5000
+mod_sim1 = coda.samples(model=mod1,
+                        variable.names=params,
+                        n.iter=15e3)
+mod_csim1 = as.mcmc(do.call(rbind, mod_sim1)) # combined chains
+```
+
+## Check the model
+
+A series of checks are run these include:
+ 1. Checking the trace plots of the parameters p[1] to p[4].
+ 2. Running the Gelman-Rubin diagnostic.
+ 3. Checking the autocorrelation diagnostic.
+ 4. Checking the effective size of the model.
+
+# Checking the trace plots of the parameters p[1] to p[4].
+
+No long term trends are observed in the trace plots. These trace plots look sufficient.
+
+```{r}
+plot(mod_sim1)
+```
+
+# Running the gelman diagnostic.
+The Gelman–Rubin convergence diagnostic provides a numerical convergence summary based on multiple chains. The potential scale reudction factor is 1 suggesting convergence.
+
+```{r}
+gelman.diag(mod_sim1)
+```
+# Checking the autocorrelation diagnostic.
+
+```{r}
+autocorr.diag(mod_sim1)
+```
+We see very high autocorrelation with initial values (first two terms) for p[1],p[3] and p[4]. This should prompt us to check the effective size.
+
+# checking the effective size
+The effective sample sizes show they are close to the chain lengths indicating that they mixed very well
+
+```{r}
+effectiveSize(mod_sim1)
+```
+
+##Summary information
+
+```{r}
+summary(mod_sim1)
+```
+
+## Iterate if necessary
+
+# Is the model adequate?
+The model diagnostic's appear to show the model is adequate, However for completion we will retrain the model specifying a less vague conjucate prior beta distribution.
+
+# Fitting the alternative
+We fit an alternative where gamma the distribution is created with shape and scale parameter, 9 and 0.5
+
+```{r}
+
+modelString1A="
+model {
+   #Likelihood
+  for (i in 1:nGroups) {
+    obs[i] ~ dbin(p[i],n[i])
+    p[i] ~ dbeta(a[i],b[i])
+    a[i] ~ dgamma(9,0.5)
+    b[i] ~ dgamma(9,0.5)
+  }
+}
+"
+
+tot_samples=164+54+37+31
+params<-c("p")
+
+obs <- c(54, 164,37,31)
+data.list <- list(obs = obs, n = c(tot_samples, tot_samples,tot_samples,tot_samples), nGroups = 4)
+mod1a = jags.model(textConnection(modelString1A), data=data.list, inits=NULL, n.chains=3)
+update(mod1a, 5e3) ## burn in 5000
+mod_sim1a = coda.samples(model=mod1a,
+                        variable.names=params,
+                        n.iter=15e3)
+mod_csim1a = as.mcmc(do.call(rbind, mod_sim1a)) # combined chains
+
+
+```
+ # next test the diagnostics for the model
+ 
+```{r}
+plot(mod_sim1a)
+
+```
+ 
+```{r}
+gelman.diag(mod_sim1a)
+
+```
+```{r}
+
+autocorr.diag(mod_sim1a)
+
+```
+```{r}
+effectiveSize(mod_sim1a)
+
+```
+Note the effective size is larger and the lag correlations are not as high for p[1] to p[4]
+
+The summary information is shown below, it is approximately the same as the fist iteration
+
+```{r}
+summary(mod_sim1a)
+```
+
+
+##  Using the model
+
+# Provide relevant posterior summaries.
+The summary information is listed below (detailing the posterior distributions), we can see that collectively, the fractions of 1/4, 1/4,1/4,1/4 (0.25,0.25,0.25,0.25)  do not fall within these ranges. 
+
+```{r}
+summary(mod_sim1a)
+```
+
+# Interpret the model results in the context of the problem and come to a conclusion
+
+There appears to be a strong association between irradiation and recurrence of cancer, and non irradiation and non recurence of cancer.
+
+
