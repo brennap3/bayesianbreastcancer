@@ -2,7 +2,9 @@
 title: "Coursera-mcmc-statistics-peer-review-article"
 author: "Peter Brennan"
 date: "3/29/2021"
-output: html_document
+output:
+  html_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
