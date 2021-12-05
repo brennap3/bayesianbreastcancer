@@ -6,12 +6,14 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
 ```
 
 ## load libraries
 
-```{r, echo=FALSE, warning=FALSE}
+Loading libraries
+
+```{r, echo=FALSE, warning = FALSE, message = FALSE}
 ##install.packages("tidyverse")
 library(magrittr)
 require(FactoMineR)
@@ -44,7 +46,7 @@ The data contains a data file containing the data and a names file containing so
  9. breast-quad: left-up, left-low, right-up,	right-low, central.
  10. irradiation:	yes, no.
 
-It should be noted that all data are categorical in nature. We will read in the data, set the column names and output the first 5 rows to see the form of the data, we will also the degree.malgnant data attribute to a factor as this is ordinal data not numeric. 
+It should be noted that all data are categorical in nature. We will read in the data, set the column names and output the first 5 rows to see the form of the data, we will also set the degree.malgnant data attribute to a factor as this is ordinal data not numeric. 
 
 ```{r , echo=TRUE}
 breast.cancer<-read.csv("breast-cancer.data",header=FALSE,sep=",")
@@ -95,8 +97,7 @@ ggplot(data = mca1_vars_df, aes(x = Dim.1, y = Dim.2, label = rownames(mca1_vars
 
 ```
 From the plot we can see some potentially interesting associations:
- 1. There appears to be a strong association between irradiation and recurrence events as opposed
-to a strong association with  no irradiation and no-recurrence events
+ 1. There appears to be a strong association between irradiation and recurrence events as opposed to a strong association with  no irradiation and no-recurrence events.
  2. There also appears to be a strong relationship between node-cap-no and Class.
  
 This is a little clearer if we create an interactive plot, which allows us to interactively explore the data:
@@ -255,7 +256,7 @@ summary(mod_sim1)
 ## Iterate if necessary
 
 # Is the model adequate?
-The model diagnostic's appear to show the model is adequate, However for completion we will retrain the model specifying a less vague conjucate prior beta distribution.
+The model diagnostic's appear to show the model is adequate, however for completion we will retrain the model specifying a less vague conjucate prior beta distribution.
 
 # Fitting the alternative
 We fit an alternative where gamma the distribution is created with shape and scale parameter, 9 and 0.5
@@ -288,7 +289,7 @@ mod_csim1a = as.mcmc(do.call(rbind, mod_sim1a)) # combined chains
 
 
 ```
- # next test the diagnostics for the model
+# Next test the diagnostics for the model
  
 ```{r}
 plot(mod_sim1a)
